@@ -1,0 +1,8 @@
+prefix=@PREFIX@
+includedir=${prefix}/include
+
+Name: SQLite3pp
+Description: C++ SQLite3 wrapper
+Version: 1.0.8
+Requires: sqlite3
+Cflags: -I${includedir}

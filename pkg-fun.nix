@@ -1,11 +1,18 @@
-{ stdenv }: stdenv.mkDerivation {
-  pname   = "sqlite3pp";
-  version = "1.0.8";
-  buildCommand = ''
-    mkdir -p "$out/include";
-    cp "${./sqlite3pp.hh}"     "$out/include/sqlite3pp.hh";
-    cp "${./sqlite3pp.ipp}"    "$out/include/sqlite3pp.ipp";
-    cp "${./sqlite3ppext.hh}"  "$out/include/sqlite3ppext.hh";
-    cp "${./sqlite3ppext.ipp}" "$out/include/sqlite3ppext.ipp";
+{ lib, stdenv, sqlite }: stdenv.mkDerivation {
+  pname                 = "sqlite3pp";
+  version               = "1.0.8";
+  include               = builtins.path { path = ./include; };
+  lib                   = builtins.path { path = ./lib;     };
+  propagatedBuildInputs = [sqlite.dev];
+  unpackPhase           = ":";
+  dontPatch             = true;
+  dontConfigure         = true;
+  dontBuild             = true;
+  installPhase          = ''
+    mkdir -p "$out/lib/pkgconfig";
+    cp -r "$include" "$out/include";
+    sed "s,@PREFIX@,$out," "$lib/pkgconfig/sqlite3pp.pc.in"  \
+        > "$out/lib/pkgconfig/sqlite3pp.pc";
   '';
+  meta.license = lib.licenses.mit;
 }
