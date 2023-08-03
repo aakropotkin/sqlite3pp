@@ -236,6 +236,17 @@ namespace sqlite3pp
     return sqlite3_errmsg(db_);
   }
 
+  inline int database::execute( std::string_view sql )
+  {
+    std::string s( sql );
+    return sqlite3_exec(db_, s.c_str(), 0, 0, 0);
+  }
+
+  inline int database::execute( const std::string & sql )
+  {
+    return sqlite3_exec(db_, sql.c_str(), 0, 0, 0);
+  }
+
   inline int database::execute(char const* sql)
   {
     return sqlite3_exec(db_, sql, 0, 0, 0);

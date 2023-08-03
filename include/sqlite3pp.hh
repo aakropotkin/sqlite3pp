@@ -27,8 +27,7 @@
  *
  * -------------------------------------------------------------------------- */
 
-#ifndef SQLITE3PP_H
-#define SQLITE3PP_H
+#pragma once
 
 #define SQLITE3PP_VERSION "1.0.8"
 #define SQLITE3PP_VERSION_MAJOR 1
@@ -42,14 +41,18 @@
 #include <tuple>
 
 #ifdef SQLITE3PP_LOADABLE_EXTENSION
-#include <sqlite3ext.h>
-SQLITE_EXTENSION_INIT1
+#  include <sqlite3ext.h>
+   SQLITE_EXTENSION_INIT1
 #else
 #  include <sqlite3.h>
 #endif
 
+
+/* -------------------------------------------------------------------------- */
+
 namespace sqlite3pp
 {
+
   class database;
 
   namespace ext
@@ -57,15 +60,17 @@ namespace sqlite3pp
     class function;
     class aggregate;
     database borrow( sqlite3 * pdb );
-  }
+  }  /* End namespace `ext' */
 
-  template <class T> struct convert { using to_int = int; };
 
-  class null_type {};
+/* -------------------------------------------------------------------------- */
 
-  class noncopyable
-  {
-   protected:
+template <class T> struct convert { using to_int = int; };
+
+class null_type {};
+
+class noncopyable {
+  protected:
     noncopyable()  = default;
     ~noncopyable() = default;
 
@@ -74,17 +79,20 @@ namespace sqlite3pp
 
     noncopyable & operator=(       noncopyable && ) = default;
     noncopyable & operator=( const noncopyable &  ) = delete;
-  };
+};  /* End class `noncopyable' */
 
-  class database : noncopyable
-  {
-    friend class statement;
-    friend class database_error;
-    friend class ext::function;
-    friend class ext::aggregate;
-    friend database ext::borrow( sqlite3 * pdb );
 
-   public:
+/* -------------------------------------------------------------------------- */
+
+class database : noncopyable {
+
+  friend class statement;
+  friend class database_error;
+  friend class ext::function;
+  friend class ext::aggregate;
+  friend database ext::borrow( sqlite3 * pdb );
+
+  public:
     using busy_handler     = std::function<int (int)>;
     using commit_handler   = std::function<int ()>;
     using rollback_handler = std::function<void ()>;
@@ -137,8 +145,10 @@ namespace sqlite3pp
 
     const char * error_msg() const;
 
-    int execute(  const char * sql );
-    int executef( const char * sql, ... );
+    int execute(        std::string_view   sql );
+    int execute(  const std::string      & sql );
+    int execute(  const char             * sql );
+    int executef( const char             * sql, ... );
 
     int set_busy_timeout( int ms );
 
@@ -148,10 +158,9 @@ namespace sqlite3pp
     void set_update_handler(    update_handler    h );
     void set_authorize_handler( authorize_handler h );
 
-   private:
+  private:
     database(sqlite3* pdb) : db_( pdb ), borrowing_( true ) {}
 
-   private:
     sqlite3 * db_;
     bool      borrowing_;
 
@@ -160,20 +169,23 @@ namespace sqlite3pp
     rollback_handler  rh_;
     update_handler    uh_;
     authorize_handler ah_;
-  };
 
-  class database_error : public std::runtime_error
-  {
-   public:
+};  /* End class `database' */
+
+class database_error : public std::runtime_error {
+  public:
     explicit database_error( const char * msg );
     explicit database_error( database & db );
-  };
+};  /* End class `database_error' */
 
-  enum copy_semantic { copy, nocopy };
+enum copy_semantic { copy, nocopy };
 
-  class statement : noncopyable
-  {
-   public:
+
+/* -------------------------------------------------------------------------- */
+
+class statement : noncopyable {
+
+  public:
     int prepare( const char * stmt );
     int finish();
 
@@ -205,90 +217,97 @@ namespace sqlite3pp
     int step();
     int reset();
 
-   protected:
+  protected:
     explicit statement( database & db, const char * stmt = nullptr );
     ~statement();
 
     int prepare_impl( const char         * stmt );
     int finish_impl(        sqlite3_stmt * stmt );
 
-   protected:
+  protected:
           database     & db_;
           sqlite3_stmt * stmt_;
     const char         * tail_;
-  };
 
-  class command : public statement
-  {
-   public:
+};  /* End class `statement' */
+
+
+/* -------------------------------------------------------------------------- */
+
+class command : public statement {
+
+  public:
     class bindstream
     {
-     public:
-      bindstream( command & cmd, int idx );
+      public:
+        bindstream( command & cmd, int idx );
 
-        template <class T> bindstream &
-      operator<<( T value )
-      {
-        auto rc = cmd_.bind( idx_, value );
-        if ( rc != SQLITE_OK ) { throw database_error(cmd_.db_); }
-        ++idx_;
-        return * this;
-      }
-
-        bindstream &
-      operator<<( char const * value )
-      {
-        auto rc = cmd_.bind( idx_, value, copy );
-        if ( rc != SQLITE_OK) { throw database_error( cmd_.db_ ); }
-        ++idx_;
-        return * this;
-      }
-
-        bindstream &
-      operator<<( std::string const & value )
-      {
-        auto rc = cmd_.bind( idx_, value, copy );
-        if ( rc != SQLITE_OK ) { throw database_error( cmd_.db_ ); }
-        ++idx_;
-        return * this;
-      }
-
-     private:
-      command & cmd_;
-      int       idx_;
-    };
-
-    explicit command( database & db, const char * stmt = nullptr );
-
-    bindstream binder( int idx = 1 );
-
-    int execute();
-    int execute_all();
-  };
-
-  class query : public statement
-  {
-   public:
-    class rows
-    {
-     public:
-      class getstream
-      {
-       public:
-        getstream( rows * rws, int idx );
-
-          template <class T> getstream &
-        operator>>( T & value )
+          template <class T> bindstream &
+        operator<<( T value )
         {
-          value = rws_->get( idx_, T() );
+          auto rc = cmd_.bind( idx_, value );
+          if ( rc != SQLITE_OK ) { throw database_error(cmd_.db_); }
           ++idx_;
           return * this;
         }
 
-       private:
-        rows * rws_;
-        int    idx_;
-      };
+          bindstream &
+        operator<<( char const * value )
+        {
+          auto rc = cmd_.bind( idx_, value, copy );
+          if ( rc != SQLITE_OK) { throw database_error( cmd_.db_ ); }
+          ++idx_;
+          return * this;
+        }
+
+          bindstream &
+        operator<<( std::string const & value )
+        {
+          auto rc = cmd_.bind( idx_, value, copy );
+          if ( rc != SQLITE_OK ) { throw database_error( cmd_.db_ ); }
+          ++idx_;
+          return * this;
+        }
+
+      private:
+        command & cmd_;
+        int       idx_;
+    };  /* End class `command::bindstream' */
+
+  explicit command( database & db, const char * stmt = nullptr );
+
+  bindstream binder( int idx = 1 );
+
+  int execute();
+  int execute_all();
+
+};  /* End class `command' */
+
+
+/* -------------------------------------------------------------------------- */
+
+class query : public statement {
+
+  public:
+    class rows {
+
+      public:
+        class getstream {
+          public:
+           getstream( rows * rws, int idx );
+
+             template <class T> getstream &
+           operator>>( T & value )
+           {
+             value = rws_->get( idx_, T() );
+             ++idx_;
+             return * this;
+           }
+
+          private:
+            rows * rws_;
+            int    idx_;
+        };  /* End class `query::rows::getstream' */
 
       explicit rows( sqlite3_stmt* stmt );
 
@@ -304,26 +323,28 @@ namespace sqlite3pp
         return std::make_tuple( get( idxs, Ts() )... );
       }
 
-      getstream getter(int idx = 0);
+      getstream getter( int idx = 0 );
 
-     private:
-      int           get( int idx, int           ) const;
-      double        get( int idx, double        ) const;
-      long long int get( int idx, long long int ) const;
-      std::string   get( int idx, std::string   ) const;
-      null_type     get( int idx, null_type     ) const;
+      private:
+        int           get( int idx, int           ) const;
+        double        get( int idx, double        ) const;
+        long long int get( int idx, long long int ) const;
+        std::string   get( int idx, std::string   ) const;
+        null_type     get( int idx, null_type     ) const;
 
-      const char * get( int idx, const char * ) const;
-      const void * get( int idx, const void * ) const;
+        const char * get( int idx, const char * ) const;
+        const void * get( int idx, const void * ) const;
 
-     private:
-      sqlite3_stmt * stmt_;
-    };
+      private:
+        sqlite3_stmt * stmt_;
 
-    class query_iterator
-//      : public std::iterator<std::input_iterator_tag, rows>
-    {
-     public:
+    };  /* End class `query::rows' */
+
+
+  class query_iterator
+      : public std::iterator<std::input_iterator_tag, rows> {
+
+    public:
       using iterator_category = std::input_iterator_tag;
       using value_type        = rows;
       using difference_type   = ptrdiff_t;
@@ -348,27 +369,31 @@ namespace sqlite3pp
 
       value_type operator*() const;
 
-     private:
+    private:
       query * cmd_;
       int     rc_;
-    };
+  };  /* End class `query::query_iterator' */
 
-    explicit query( database & db, char const* stmt = nullptr );
+  explicit query( database & db, const char * stmt = nullptr );
 
-    int column_count() const;
+  int column_count() const;
 
-    char const * column_name( int idx ) const;
-    char const * column_decltype( int idx ) const;
+  char const * column_name( int idx ) const;
+  char const * column_decltype( int idx ) const;
 
-    using iterator = query_iterator;
+  using iterator = query_iterator;
 
-    iterator begin();
-    iterator end();
-  };
+  iterator begin();
+  iterator end();
 
-  class transaction : noncopyable
-  {
-   public:
+};  /* End class `query' */
+
+
+/* -------------------------------------------------------------------------- */
+
+class transaction : noncopyable {
+
+  public:
     explicit transaction( database & db
                         , bool       fcommit  = false
                         , bool       freserve = false
@@ -378,13 +403,22 @@ namespace sqlite3pp
     int commit();
     int rollback();
 
-   private:
+  private:
     database * db_;
     bool       fcommit_;
-  };
 
-} // namespace sqlite3pp
+};  /* End class `transaction' */
+
+
+/* -------------------------------------------------------------------------- */
+
+}  /* End namespace `sqlite3pp' */
 
 #include "sqlite3pp.ipp"
 
-#endif
+
+/* -------------------------------------------------------------------------- *
+ *
+ *
+ *
+ * ========================================================================== */
