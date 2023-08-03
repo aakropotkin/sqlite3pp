@@ -112,6 +112,20 @@ class database : noncopyable {
     , const char * vfs    = nullptr
     );
 
+    explicit database(
+      const std::string & dbname
+    ,       int           flags  = SQLITE_OPEN_READWRITE|SQLITE_OPEN_CREATE
+    , const char        * vfs    = nullptr
+    ) : database( dbname.c_str(), flags, vfs )
+    {}
+
+    explicit database(
+            std::string_view   dbname
+    ,       int                flags  = SQLITE_OPEN_READWRITE|SQLITE_OPEN_CREATE
+    , const char             * vfs    = nullptr
+    ) : database( std::string( dbname ).c_str(), flags, vfs )
+    {}
+
     database( database && db );
 
     database & operator=( database && db );
