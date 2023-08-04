@@ -233,6 +233,10 @@ class statement : noncopyable {
 
   protected:
     explicit statement( database & db, const char * stmt = nullptr );
+    explicit statement( database & db, const std::string & stmt )
+      : statment( db, stmt.c_str() )
+    {}
+
     ~statement();
 
     int prepare_impl( const char         * stmt );
